@@ -69,5 +69,6 @@ def main():
     out, w = model(t)
     print(out.shape)
     print(w.shape)
+
 if __name__ == "__main__":
     main()
