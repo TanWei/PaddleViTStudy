@@ -2,10 +2,12 @@
 # Author: Dr. Zhu
 # Project: PaddleViT (https://github.com/BR-IDL/PaddleViT)
 # 2021.11
+from turtle import forward
 import paddle
 import paddle.nn as nn
 import numpy as np
 from PIL import Image
+from torch import dropout
 
 paddle.set_device('cpu')
 
@@ -48,36 +50,39 @@ class PatchEmbedding(nn.Layer):
                                          bias_attr=False)
         self.dropout = nn.Dropout(dropout)
         # 第四节课新加的内容
-        self.class_token = paddle.create_parameter(
+        self.cls_token = paddle.create_parameter(
             shape=[1, 1, embed_dim],
             dtype='float32',
             default_initializer=nn.initializer.Constant(0.)
         )
         
         self.position_embeding = paddle.create_parameter(
-            shape=[1, n_patches+1, embed_dim],
+            shape=[1, n_patches+2, embed_dim],
             dtype='float32',
             default_initializer=nn.initializer.TruncatedNormal(std=.02)
         )
 
-    def forward(self, x):        
+        self.distill_token = paddle.create_parameter(
+            shape=[1, 1, embed_dim],
+            dtype='float32',
+            default_initializer=nn.initializer.TruncatedNormal(std=.02)
+        )
+    def forward(self, x):    
+        cls_tokens = self.cls_token.expand((x.shape[0], -1, -1))
+        distill_tokens = self.cls_token.expand((x.shape[0], -1, -1))
+        
         # [n, c, h, w] 
         x = self.patch_embedding(x) # [n, c', h', w'] c'=embed_dim
         x = x.flatten(2) # [n, c', h'*w']  [4, 16, 32*32] h'*w' = num_patches
         x = x.transpose([0, 2, 1]) # [n, h'*w', c'] [4, 1024, 16]
-        # lesson 4 begin
-        # [4,1024,16]     4张 1024个tokens 每个tokens有16个信息
-        print(x.shape)
-        # cls_tokens = self.class_token.expand((x.shape[0], 1, self.embed_dim)) # [n, 1, embed_dim]
-        print(self.class_token.shape) # [1, 1, 16]
-        cls_tokens = self.class_token.expand((x.shape[0], -1, -1))
-        print(cls_tokens.shape)
-        # [4, 1, 16]
-        x = paddle.concat([cls_tokens, x], axis=1)
-        print(self.position_embeding.shape)
+        
+        x = paddle.concat([cls_tokens, distill_tokens, x], axis=1)
+
         # [1, 1025, 16]
         x = x + self.position_embeding
         # lesson 4 end
+        
+        
         x = self.dropout(x)
         return x
 
@@ -170,60 +175,56 @@ class EncoderLayer(nn.Layer):
         return x
 
 
-class ViT(nn.Layer):
-    def __init__(self):
+class Encoder(nn.Layer):
+    def __init__(self, embed_dim, depth):
         super().__init__()
-        # 为什么是16
-        self.patch_embed = PatchEmbedding(224, 7, 3, 16)
-        layer_list = [EncoderLayer(16) for i in range(5)]
-        self.encoders = nn.LayerList(layer_list)
-        self.head = nn.Linear(16, 10)
-        self.avgpool = nn.AdaptiveAvgPool1D(1)
-
-    def forward(self, x):
-        # [n, c, h, w]  => [n, 32*32, embed_dim]
-        x = self.patch_embed(x) # [n, h*w, c]: 4, 1024, 16
-        print(x.shape)
-        for encoder in self.encoders:
-            x = encoder(x)
-        # avg
-        x = x.transpose([0, 2, 1])
-        x = self.avgpool(x)
-        x = x.flatten(1)
-        x = self.head(x)
-        return x
-    
-class ViT2(nn.Layer):
-    def __init__(self):
-        super().__init__()
-        # 为什么是16
-        self.patch_embed = PatchEmbedding(224, 7, 3, 16)
-        layer_list = [EncoderLayer(16) for i in range(5)]
-        self.encoders = nn.LayerList(layer_list)
-        # self.head = nn.Linear(16, 10)
-        # self.avgpool = nn.AdaptiveAvgPool1D(1)
-        emded_dim = 16
-        num_classes = 1000 
-        self.classifier = nn.Linear(emded_dim, num_classes)
-
-    def forward(self, x):
-        # [n, c, h, w]  => [n, 32*32, embed_dim]
-        x = self.patch_embed(x) # [n, h*w, c]: 4, 1024, 16
-        print(x.shape)
-        for encoder in self.encoders:
-            x = encoder(x)
-        # avg
+        layer_list = []
+        for i in range(depth):
+            encoder_layer = EncoderLayer(embed_dim)
+            layer_list.append(encoder_layer)
         
-        x = self.classifier(x[:, 0]) # 每行第一个元素
-        return x
+        self.layers = nn.LayerList(layer_list)
+        self.norm = nn.LayerNorm(embed_dim)
+    def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)
+        x = self.norm(x)
+        return x[:, 0], x[:, 1]
 
-
+class DeiT(nn.Layer):
+    def __init__(self,
+                image_size=224,
+                patch_size=16,
+                in_channels=3,
+                num_classes=1000,
+                embed_dim=768,
+                depth=3,
+                num_headers=8,
+                mlp_ratio=4,
+                qkv_bias=True,
+                dropout=0.,
+                attention_dropout=0.,
+                droppath=0.):
+        super().__init__()
+        self.patch_embed = PatchEmbedding(224, 16, 3, 768)
+        self.encoder = Encoder(embed_dim, depth)
+        self.head = nn.Linear(embed_dim, num_classes)
+        self.head_distill = nn.Linear(embed_dim, num_classes)
+        
+    def forward(self, x):
+        x = self.patch_embed(x)
+        x, x_distill = self.encoder(x)
+        x = self.head(x)
+        x_distill = self.head_distill(x_distill)
+        if self.training:
+            return x, x_distill
+        else:
+            return (x + x_distill) / 2
+        
 def main():
-    t = paddle.randn([4, 3, 224, 224])
-    model = ViT()
-    out = model(t)
-    print(out.shape)
-
+    model = DeiT()
+    print(model)
+    paddle.summary(model, (4, 3, 224, 224))
 
 if __name__ == "__main__":
     main()
