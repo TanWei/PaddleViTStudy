@@ -219,7 +219,7 @@ class DeiT(nn.Layer):
         if self.training:
             return x, x_distill
         else:
-            return (x + x_distill) / 2
+            return (x + x_distill) / 2 #  软蒸馏
         
 def main():
     model = DeiT()
