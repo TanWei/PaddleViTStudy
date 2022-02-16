@@ -1,0 +1,1 @@
+![图片](./how_conv_is_computed.png)
