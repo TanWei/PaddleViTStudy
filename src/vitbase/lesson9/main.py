@@ -1,6 +1,3 @@
-from lib2to3.pytree import Node
-from turtle import forward
-from numpy import identity
 import paddle
 import paddle.nn as nn
 
@@ -286,15 +283,24 @@ class Swin(nn.Layer):
         self.fc = nn.Linear(self.num_features, num_classes)
     def forward(self, x):
         x = self.patch_embedding(x)
+        # [4, 3136, 96] [batch_size, token_num, embed_dim]
         for stage in self.stages:
             print('stage')
             x = stage(x)
-        x = self.norm(x)
-        x = x.transpose([0, 2, 1]) #[B, embed_dim, num_windows]
+        print(x.shape)
+        # [4, 49, 768] [batch_size, (56/2^3)*(56/2^3), 8*96]
+        x = self.norm(x) 
+        x = x.transpose([0, 2, 1]) #[B, embed_dim, num_windows] [4, 768, 49]
         x = self.avgpool(x)
-        # [B, embed_dim, 1]
+        # [4, 768, 1]
+        print(x.shape)
+        # [B, embed_dim, 1] [4, 768, 1]
         x = x.flatten(1)
+        print(x.shape)
+        # [4, 768]
         x = self.fc(x)
+        print(x.shape)
+        # [4, 1000]
         return x
     
 def main():
