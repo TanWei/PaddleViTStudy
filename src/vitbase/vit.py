@@ -188,7 +188,7 @@ class ViT(nn.Layer):
             x = encoder(x)
         # avg
         x = x.transpose([0, 2, 1])
-        x = self.avgpool(x)
+        x = self.avgpool(x) # 所有的输出取平均
         x = x.flatten(1)
         x = self.head(x)
         return x
