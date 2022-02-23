@@ -7,3 +7,7 @@
 ![图片](./MobileViT_block.png)
 <b>论文主要部分如何将conv后的tensor输入到transformer里面</b>
 ![图片](./如何将conv后的tensor输入到transformer里面.png)
+
+### 数据加载
+python for循环原理
+![图片](./for原理.png)
