@@ -2,6 +2,9 @@ from re import X
 from turtle import forward
 import paddle
 import paddle.nn as nn
+import numpy as np
+from PIL import Image
+
 
 class Identify(nn.Layer):
     def __init__(self):
@@ -43,3 +46,20 @@ class PatchEmbedding(nn.Layer):
         x = x.transpose([0, 2, 1]) #[n , h'*w', embed_dim]
         x = self.dropout(x)
         return x
+    
+def main():
+    img = Image.open('D:/githubSpace/mine/PaddleViTStudy/src/vitbase./724.jpg')
+    img = np.array(img)
+    for i in range(28):
+        for j in range(28):
+            print(f'{img[i,j]:03} ', end='')
+        print()
+    sample = paddle.to_tensor(img, dtype='float32')
+    sample = sample.reshape([1,1,28,28])
+    #2.patch embedding
+    patch_embed = PatchEmbedding(image_size=128, patch_size=7, in_channels=1, embed_dim=96)
+    out = patch_embed(sample)
+    #3.MLP
+    
+if __name__ == "__main__":
+    main()

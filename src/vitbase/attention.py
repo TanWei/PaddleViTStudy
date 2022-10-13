@@ -1,5 +1,4 @@
 from math import fabs
-from cv2 import transpose
 import paddle
 import paddle.nn as nn
 
@@ -13,6 +12,7 @@ class Attention(nn.Layer):
                  dropout=0.,
                  attention_dropout=0.):
         super().__init__()
+        # embed_dim=96, num_heads=4, qkv_bias=False, qk_scale=None
         self.num_heads = num_heads # 4
         self.embed_dim = embed_dim # 96
         self.head_dim = int(embed_dim / num_heads) #24
