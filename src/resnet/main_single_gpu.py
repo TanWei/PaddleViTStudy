@@ -84,7 +84,7 @@ def main():
                         optimizer,
                         epoch,
                         total_epoch)
-        scheduler.step()
+        scheduler.step()  #每个epoch降低learningrate
         validate(model, val_dataloader, criterion)
 
 

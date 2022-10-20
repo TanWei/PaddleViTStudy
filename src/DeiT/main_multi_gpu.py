@@ -331,8 +331,8 @@ def main_worker(*args):
     model_ema = None #指数移动平均  忽略
     if not config.EVAL and config.TRAIN.MODEL_EMA and local_rank == 0:
         model_ema = ModelEma(model, decay=config.TRAIN.MODEL_EMA_DECAY)
-    model = paddle.DataParallel(model)
-
+    model = paddle.DataParallel(model) #
+    # args=(config, dataset_train, dataset_val, )
     # STEP 2: Create train and val dataloader
     dataset_train, dataset_val = args[1], args[2]
     # Create training dataloader
@@ -349,7 +349,7 @@ def main_worker(*args):
     if local_rank == 0:
         master_logger.info(f'----- Total # of val batch (single gpu): {total_batch_val}')
 
-    # STEP 3: Define Mixup function
+    # STEP 3: Define Mixup function #数据增强
     mixup_fn = None
     if config.TRAIN.MIXUP_PROB > 0 or config.TRAIN.CUTMIX_ALPHA > 0 or config.TRAIN.CUTMIX_MINMAX is not None:
         mixup_fn = Mixup(mixup_alpha=config.TRAIN.MIXUP_ALPHA,
