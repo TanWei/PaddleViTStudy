@@ -1,6 +1,5 @@
 import paddle
 import paddle.nn as nn
-from resnet18 import ResNet18
 from dataset import get_dataset
 from dataset import get_dataloader
 from utils import AverageMeter
@@ -17,7 +16,7 @@ def train_one_epoch(model, dataloader, criterion, optimizer, epoch, total_epoch,
     for batch_id, data in enumerate(dataloader):
         image = data[0]
         label = data[1]
-
+        # image dimension requrements ([4, 3, 224, 224])
         out = model(image)
         loss = criterion(out, label)
 
@@ -25,10 +24,10 @@ def train_one_epoch(model, dataloader, criterion, optimizer, epoch, total_epoch,
         optimizer.step()
         optimizer.clear_grad()
         
-        if p != None:
-            p.step()
+        if profiler != None:
+            profiler.step()
             if batch_id == 19:
-                p.stop()
+                profiler.stop()
                 exit()
 
         pred = nn.functional.softmax(out, axis=1)
@@ -67,8 +66,9 @@ def validate(model, dataloader, critertion):
     print(f'----- Validation Loss: {loss_meter.avg:.4}, Acc@1: {acc_meter.avg:.2}')
 
 def train():
+    device = paddle.device.get_device()
     total_epoch = 200
-    batch_size = 16
+    batch_size = 4
     # 1
     model  = ViT2()
     # 2
@@ -101,12 +101,14 @@ def train():
     # 8 开始训练
     print("start training...")
     for epoch in range(1, total_epoch+1):
+        # model, dataloader, criterion, optimizer, epoch, total_epoch, report_freq=10, profiler=None
         train_one_epoch(model,
                         train_dataloader,
                         criterion,
                         optimizer,
                         epoch,
                         total_epoch,
+                        10,
                         p)
         scheduler.step()
         #validate(model, val_dataloader, criterion) #统计精确度

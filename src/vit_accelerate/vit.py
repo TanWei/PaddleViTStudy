@@ -168,59 +168,72 @@ class EncoderLayer(nn.Layer):
         x = self.mlp(x)
         x = x + h
         return x
-
-
-class ViT(nn.Layer):
-    def __init__(self):
+class Encoder(nn.Layer):
+    def __init__(self, embed_dim, depth):
         super().__init__()
-        # 为什么是16
-        self.patch_embed = PatchEmbedding(224, 7, 3, 16)
-        layer_list = [EncoderLayer(16) for i in range(5)]
-        self.encoders = nn.LayerList(layer_list)
-        self.head = nn.Linear(16, 10)
-        self.avgpool = nn.AdaptiveAvgPool1D(1)
+        layer_list = []
+        for i in range(depth):
+            encoder_layer = EncoderLayer(embed_dim)
+            layer_list.append(encoder_layer)
+        self.layers = nn.LayerList(layer_list)
 
+        self.norm = nn.LayerNorm(embed_dim)
+        
     def forward(self, x):
-        # [n, c, h, w]  => [n, 32*32, embed_dim]
-        x = self.patch_embed(x) # [n, h*w, c]: 4, 1024, 16
-        print(x.shape)
-        for encoder in self.encoders:
-            x = encoder(x)
-        # avg
-        x = x.transpose([0, 2, 1])
-        x = self.avgpool(x) # 所有的输出取平均
-        x = x.flatten(1)
-        x = self.head(x)
+        for layer in self.layers:
+            x = layer(x)
+            
+        x = self.norm(x)
         return x
+# class ViT(nn.Layer):
+#     def __init__(self):
+#         super().__init__()
+#         # 为什么是16
+#         self.patch_embed = PatchEmbedding(224, 7, 3, 16)
+#         layer_list = [EncoderLayer(16) for i in range(5)]
+#         self.encoders = nn.LayerList(layer_list)
+#         self.head = nn.Linear(16, 10)
+#         self.avgpool = nn.AdaptiveAvgPool1D(1)
+
+#     def forward(self, x):
+#         # [n, c, h, w]  => [n, 32*32, embed_dim]
+#         x = self.patch_embed(x) # [n, h*w, c]: 4, 1024, 16
+#         print(x.shape)
+#         for encoder in self.encoders:
+#             x = encoder(x)
+#         # avg
+#         x = x.transpose([0, 2, 1])
+#         x = self.avgpool(x) # 所有的输出取平均
+#         x = x.flatten(1)
+#         x = self.head(x)
+#         return x
     
 class ViT2(nn.Layer):
     def __init__(self):
         super().__init__()
-        # 为什么是16
-        self.patch_embed = PatchEmbedding(224, 7, 3, 16)
-        layer_list = [EncoderLayer(16) for i in range(5)]
-        self.encoders = nn.LayerList(layer_list)
-        # self.head = nn.Linear(16, 10)
-        # self.avgpool = nn.AdaptiveAvgPool1D(1)
-        emded_dim = 16
-        num_classes = 1000 
-        self.classifier = nn.Linear(emded_dim, num_classes)
+        self.image_size = 224
+        self.patch_size = 16
+        self.in_channels = 3
+        self.embed_dim = 768
+        
+        self.patch_embed = PatchEmbedding(224, 16, 3, 768)
+        self.encoder = Encoder(self.embed_dim, 5)
+        self.classifier = nn.Linear(self.embed_dim, 1000)
 
     def forward(self, x):
+        # x => [4, 3, 224, 224]
         # [n, c, h, w]  => [n, 32*32, embed_dim]
         x = self.patch_embed(x) # [n, h*w, c]: 4, 1024, 16
         print(x.shape)
-        for encoder in self.encoders:
-            x = encoder(x)
+        x = self.encoder(x)
         # avg
-        
         x = self.classifier(x[:, 0]) # 每行第一个元素
         return x
 
 
 def main():
     t = paddle.randn([4, 3, 224, 224])
-    model = ViT()
+    model = ViT2()
     out = model(t)
     print(out.shape)
     print("===end===")
