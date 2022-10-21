@@ -100,7 +100,9 @@ def train():
     total_epoch = 200
     batch_size = 16
     # 1
-    model  = ViT2()
+    # model  = ViT2()
+    config = get_config()
+    model = build_vit(config)
     # config = get_config()
     # model = build_vit(config)
     # 2

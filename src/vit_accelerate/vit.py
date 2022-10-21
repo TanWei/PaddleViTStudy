@@ -59,7 +59,7 @@ class PatchEmbedding(nn.Layer):
             dtype='float32',
             default_initializer=nn.initializer.TruncatedNormal(std=.02)
         )
-
+        
     def forward(self, x):        
         # [n, c, h, w] 
         x = self.patch_embedding(x) # [n, c', h', w'] c'=embed_dim
@@ -218,7 +218,11 @@ class ViT2(nn.Layer):
         
         self.patch_embed = PatchEmbedding(224, 16, 3, 768)
         self.encoder = Encoder(self.embed_dim, 5)
+        
+       
         self.classifier = nn.Linear(self.embed_dim, 1000)
+
+
 
     def forward(self, x):
         # x => [4, 3, 224, 224]
@@ -226,6 +230,7 @@ class ViT2(nn.Layer):
         x = self.patch_embed(x) # [n, h*w, c]: 4, 1024, 16
         print(x.shape)
         x = self.encoder(x)
+        # x = self.pre_logits(x[:, 0]) # cls_token only
         # avg
         x = self.classifier(x[:, 0]) # 每行第一个元素
         return x
