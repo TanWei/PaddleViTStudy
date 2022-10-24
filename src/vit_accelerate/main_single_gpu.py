@@ -6,6 +6,14 @@ from utils import AverageMeter
 import requests
 from vit import ViT2
 import paddle.profiler as profiler
+import time
+import numpy as np
+import random
+from vit111 import build_vit
+from config import get_config
+
+
+train_time = 0 # 记录总训练时长
 
 def train_one_epoch(model, dataloader, criterion, optimizer, epoch, total_epoch, report_freq=10, profiler=None):
     print(f'----- Training Epoch [{epoch}/{total_epoch}]:')
@@ -13,17 +21,38 @@ def train_one_epoch(model, dataloader, criterion, optimizer, epoch, total_epoch,
     acc_meter = AverageMeter()
     model.train()
     # TODO AMP 提速
+    amp = False
+    if amp:
+        scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
+
     for batch_id, data in enumerate(dataloader):
         image = data[0]
         label = data[1]
-        # image dimension requrements ([4, 3, 224, 224])
-        out = model(image)
-        loss = criterion(out, label)
 
-        loss.backward()
-        optimizer.step()
-        optimizer.clear_grad()
-        
+        start_time = time.time() # 记录开始训练时刻
+        if not amp:
+            # image dimension requrements ([4, 3, 224, 224])
+            print("image shape", paddle.to_tensor(image).shape)
+            out = model(image)
+            print("out shape")
+            loss = criterion(out, label)
+
+            loss.backward()
+            optimizer.step()
+            optimizer.clear_grad()
+        else:
+            with paddle.amp.auto_cast(custom_white_list={'elementwise_add'}, level='O1'):
+                out = model(image) # 前向计算（9层Linear网络，每层由matmul、add算子组成）
+                loss = criterion(out, label) # loss计算
+            scaled = scaler.scale(loss) # loss缩放，乘以系数loss_scaling
+            scaled.backward()           # 反向传播
+            
+            scaler.minimize(optimizer, scaled) #等同于下面连个函数一起用
+            # scaler.step(optimizer)      # 更新参数（参数梯度先除系数loss_scaling再更新参数）
+            # scaler.update()             # 基于动态loss_scaling策略更新loss_scaling系数
+            optimizer.clear_grad(set_to_zero=False)
+
+        # train_time += time.time() - start_time
         if profiler != None:
             profiler.step()
             if batch_id == 19:
@@ -67,10 +96,13 @@ def validate(model, dataloader, critertion):
 
 def train():
     device = paddle.device.get_device()
+    print("============aaaaaaaaa==============")
     total_epoch = 200
-    batch_size = 4
+    batch_size = 16
     # 1
     model  = ViT2()
+    # config = get_config()
+    # model = build_vit(config)
     # 2
     train_dataset = get_dataset(mode='train')
     train_dataloader = get_dataloader(train_dataset, batch_size, mode='train')
@@ -114,6 +146,16 @@ def train():
         #validate(model, val_dataloader, criterion) #统计精确度
 
 def main():
+    paddle.device.set_device('gpu')
+    paddle.distributed.init_parallel_env()
+
+    world_size = paddle.distributed.get_world_size()
+    local_rank = paddle.distributed.get_rank()
+    # seed = config.SEED + local_rank
+    seed = local_rank
+    paddle.seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     train()
 
 
