@@ -12,8 +12,13 @@ import random
 from vit111 import build_vit
 from config import get_config
 
-
-train_time = 0 # 记录总训练时长
+class train_time:
+    def __init__(self):
+        self.val = 0
+    def increase(self):
+        self.val += 1
+    def val(self):
+        return self.val
 
 def train_one_epoch(model, dataloader, criterion, optimizer, epoch, total_epoch, report_freq=10, profiler=None):
     print(f'----- Training Epoch [{epoch}/{total_epoch}]:')
