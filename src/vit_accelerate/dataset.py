@@ -39,7 +39,8 @@ def get_transforms(mode='train'):
 
 def get_dataset(name='cifar10', mode='train'):
     if name == 'cifar10':
-        dataset = datasets.Cifar10(data_file='./cifar-10-python.tar.gz',mode=mode, transform=get_transforms(mode))
+        dataset = datasets.Cifar10(data_file='/home/aistudio/mydata/cifar-10-python.tar.gz', mode=mode, transform=get_transforms(mode))
+        #dataset = datasets.Cifar10(mode=mode, transform=get_transforms(mode))
 
     return dataset
 

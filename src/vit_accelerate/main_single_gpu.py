@@ -1,3 +1,5 @@
+import sys
+sys.path.append('/home/aistudio/external-libraries')
 import paddle
 import paddle.nn as nn
 from dataset import get_dataset
@@ -15,9 +17,9 @@ from config import get_config
 class train_time:
     def __init__(self):
         self.val = 0
-    def increase(self):
-        self.val += 1
-    def val(self):
+    def increase(self, start_time):
+        self.val += time.time() - start_time
+    def get_time(self):
         return self.val
 
 def train_one_epoch(model, dataloader, criterion, optimizer, epoch, total_epoch, report_freq=10, profiler=None):
@@ -26,10 +28,9 @@ def train_one_epoch(model, dataloader, criterion, optimizer, epoch, total_epoch,
     acc_meter = AverageMeter()
     model.train()
     # TODO AMP 提速
-    amp = False
+    amp = True
     if amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
-
     for batch_id, data in enumerate(dataloader):
         image = data[0]
         label = data[1]
@@ -57,11 +58,13 @@ def train_one_epoch(model, dataloader, criterion, optimizer, epoch, total_epoch,
             # scaler.update()             # 基于动态loss_scaling策略更新loss_scaling系数
             optimizer.clear_grad(set_to_zero=False)
 
-        # train_time += time.time() - start_time
         if profiler != None:
+            print("=====================profiler step()===============================")
             profiler.step()
             if batch_id == 19:
+                print("=====================profiler===============================")
                 profiler.stop()
+                print("========exit() python==================")
                 exit()
 
         pred = nn.functional.softmax(out, axis=1)
@@ -124,12 +127,17 @@ def train():
                                           weight_decay=5e-4)
     # 6 ===统计
     def my_on_trace_ready(prof): # 定义回调函数，性能分析器结束采集数据时会被调用
-      callback = profiler.export_chrome_tracing('./profiler_demo') # 创建导出性能数据到profiler_demo文件夹的回调函数
+      print("=============my_on_trace_ready===============")
+      callback = profiler.export_chrome_tracing('./lop12') # 创建导出性能数据到profiler_demo文件夹的回调函数
       callback(prof)  # 执行该导出函数
-      prof.summary(sorted_by=profiler.SortedKeys.GPUTotal) # 打印表单，按GPUTotal排序表单项
+      prof.summary(sorted_by=profiler.SortedKeys.GPUTotal, op_detail=True, thread_sep=False, time_unit='ms') # 打印表单，按GPUTotal排序表单项
+
 
     # 记录3到14个batch
-    p = profiler.Profiler(scheduler = [3,14], on_trace_ready=my_on_trace_ready, timer_only=True) # 初始化Profiler对象
+    p = profiler.Profiler(
+        targets=[profiler.ProfilerTarget.CPU, profiler.ProfilerTarget.GPU],
+        scheduler = (3,10), 
+        on_trace_ready=my_on_trace_ready) # 初始化Profiler对象
 
     p.start() # 性能分析器进入第0个step
     #===

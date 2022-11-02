@@ -62,7 +62,9 @@ class PatchEmbedding(nn.Layer):
 
     def forward(self, x):        
         # [n, c, h, w] 
+        print("debug 1")
         x = self.patch_embedding(x) # [n, c', h', w'] c'=embed_dim
+        print("debug 2")
         x = x.flatten(2) # [n, c', h'*w']  [4, 16, 32*32] h'*w' = num_patches
         x = x.transpose([0, 2, 1]) # [n, h'*w', c'] [4, 1024, 16]
         # lesson 4 begin
@@ -223,6 +225,7 @@ class ViT2(nn.Layer):
     def forward(self, x):
         # x => [4, 3, 224, 224]
         # [n, c, h, w]  => [n, 32*32, embed_dim]
+        print("debug VIT start")
         x = self.patch_embed(x) # [n, h*w, c]: 4, 1024, 16
         print(x.shape)
         x = self.encoder(x)
