@@ -66,10 +66,13 @@ def train_one_epoch(model, dataloader, criterion, optimizer, epoch, total_epoch,
                 profiler.stop()
                 print("========exit() python==================")
                 exit()
-
+                
+        record_event = profiler.RecordEvent("ZZZZmyRecordEvent")
+        record_event.begin()
         pred = nn.functional.softmax(out, axis=1)
         acc1 = paddle.metric.accuracy(pred, label.unsqueeze(-1))
-
+        record_event.end()
+        
         batch_size = image.shape[0]
         loss_meter.update(loss.cpu().numpy()[0], batch_size)
         acc_meter.update(acc1.cpu().numpy()[0], batch_size)
